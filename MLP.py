@@ -7,11 +7,12 @@ import time
 ## define MLP Layer
 # input -> hidden layer -> output layer, sigmoid as an hidden activation function
 class MLP(object) :
-	def __init__(self, input, input_shape, hidden_num, output_num) :
+	def __init__(self, input, input_shape, hidden_num, output_num, p) :
 		# input : theano symbolic variable of input, 2D tensor 
 		# input_shape : shape of input / (mini-batch size, vector length)
 		# hidden_num : number of hidden layer nodes
 		# output_num : number of output layer nodes, in MNIST case : 10
+		# p : dropconnect rate (given by theano shared variable)
 
 		input_num = input_shape[1]
 

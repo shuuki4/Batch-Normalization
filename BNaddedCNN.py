@@ -102,6 +102,11 @@ for epoch in range(50) : # to modify epoch number, change this number
 	BNlayer2.set_runmode(0)
 	MLPlayer.set_runmode(0)
 
+	# learning rate decay : multiply 0.7 per epoch, and do it for only first 13 epoches
+	# it will take learning rate to approx. 0.01 compared to the initial value
+	if epoch<13 :
+		learning_rate *= 0.7
+
 # final : test set miss rate check
 
 miss_count = 0.0
