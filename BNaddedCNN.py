@@ -3,7 +3,7 @@ import theano
 import numpy as np
 import cPickle
 import gzip
-import ConvLayer
+import BNConvLayer
 import PoolLayer
 import Dropout
 import BNMLP
@@ -46,21 +46,18 @@ learning_rate = 0.01
 # layer structure
 input = T.tensor4(name='input')
 
-convlayer1 = ConvLayer.ConvLayer(input, input_shape, filter_shape=(32, 1, 5, 5))
-poollayer1 = PoolLayer.PoolLayer(convlayer1.output, input_shape=(mini_batch_size, 32, 24, 24), pool_shape=(2,2))
-BNlayer1 = BN.BatchNormalization(input_shape=(mini_batch_size, 32, 12, 12), mode=1)
-convlayer2 = ConvLayer.ConvLayer(BNlayer1.get_result(poollayer1.output), input_shape=(mini_batch_size, 32, 12, 12), filter_shape=(64, 32, 3, 3))
-poollayer2 = PoolLayer.PoolLayer(convlayer2.output, input_shape=(mini_batch_size, 64, 10, 10), pool_shape=(2,2))
-BNlayer2 = BN.BatchNormalization(input_shape=(mini_batch_size, 64, 5, 5), mode=1)
-convlayer3 = ConvLayer.ConvLayer(BNlayer2.get_result(poollayer2.output), input_shape=(mini_batch_size, 64, 5, 5), filter_shape=(128, 64, 3, 3))
-
-mlp_input = T.reshape(convlayer3.output, (mini_batch_size, 128*3*3), ndim=2)
+convlayer1 = BNConvLayer.BNConvLayer(input_shape, filter_shape=(32, 1, 5, 5), BN=False)
+poollayer1 = PoolLayer.PoolLayer(convlayer1.get_result(input), input_shape=(mini_batch_size, 32, 24, 24), pool_shape=(2,2))
+convlayer2 = BNConvLayer.BNConvLayer(input_shape=(mini_batch_size, 32, 12, 12), filter_shape=(64, 32, 3, 3))
+poollayer2 = PoolLayer.PoolLayer(convlayer2.get_result(poollayer1.output), input_shape=(mini_batch_size, 64, 10, 10), pool_shape=(2,2))
+convlayer3 = BNConvLayer.BNConvLayer(input_shape=(mini_batch_size, 64, 5, 5), filter_shape=(128, 64, 3, 3))
+mlp_input = T.reshape(convlayer3.get_result(poollayer2.output), (mini_batch_size, 128*3*3), ndim=2)
 MLPlayer = BNMLP.BNMLP(input_shape=(mini_batch_size, 128*3*3), hidden_num=800, output_num=10)
 
 y = T.matrix('y') # real one-hot indexes
 cost = T.nnet.categorical_crossentropy(MLPlayer.get_result(mlp_input), y).sum()
 
-params = MLPlayer.params + convlayer3.params + BNlayer2.params + convlayer2.params + BNlayer1.params + convlayer1.params
+params = MLPlayer.params + convlayer3.params + convlayer2.params + convlayer1.params
 grad = T.grad(cost, params)
 updates= [(param_i, param_i-learning_rate*grad_i) for param_i, grad_i in zip(params, grad)]
 
@@ -68,7 +65,7 @@ f = theano.function([input, y], cost, updates=updates) # for train
 test_f = theano.function([input], MLPlayer.get_result(mlp_input)) # for validation, test
 
 # real train area
-for epoch in range(50) : # to modify epoch number, change this number 
+for epoch in range(500) : # to modify epoch number, change this number 
 	random_idx = np.random.permutation(train_num)
 	for mb_idx in range(train_num/mini_batch_size) :
 		# make testset
@@ -83,8 +80,8 @@ for epoch in range(50) : # to modify epoch number, change this number
 	# validation data check
 	miss_count = 0.0
 	# set BNlayer mode to test mode
-	BNlayer1.set_runmode(1)
-	BNlayer2.set_runmode(1)
+	convlayer2.set_runmode(1)
+	convlayer3.set_runmode(1)
 	MLPlayer.set_runmode(1)
 
 	for mb_idx in range(valid_num/mini_batch_size) :
@@ -98,8 +95,8 @@ for epoch in range(50) : # to modify epoch number, change this number
 	print "Epoch %d : Validation Miss rate %lf" % (epoch+1, miss_count/valid_num)
 
 	# set BNlayer mode back to train mode
-	BNlayer1.set_runmode(0)
-	BNlayer2.set_runmode(0)
+	convlayer2.set_runmode(0)
+	convlayer3.set_runmode(0)
 	MLPlayer.set_runmode(0)
 
 	# learning rate decay : multiply 0.7 per epoch, and do it for only first 13 epoches
@@ -111,8 +108,8 @@ for epoch in range(50) : # to modify epoch number, change this number
 
 miss_count = 0.0
 # set BNlayer mode to test mode
-BNlayer1.set_runmode(1)
-BNlayer2.set_runmode(1)
+convlayer2.set_runmode(1)
+convlayer3.set_runmode(1)
 MLPlayer.set_runmode(1)
 
 for mb_idx in range(test_num/mini_batch_size) :
